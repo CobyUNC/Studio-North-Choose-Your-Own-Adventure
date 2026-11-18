@@ -1,5 +1,10 @@
 """Tier-aware member-composition model for Studio North's remaining 2026 value.
 
+BEST / SUBMITTED MODEL: ``SELECTED`` (four sBG retention members, equal weights)
+run through ``forecast_ensemble``, which is exactly what ``main.py`` calls. Every
+other ``Config`` option in this file is a tested alternative used only by
+``validation/backtest.py``.
+
 The model has two blocks, both estimated by penalized maximum likelihood on the
 *person-level* renewal and ledger history (no MCMC, no fitted files):
 

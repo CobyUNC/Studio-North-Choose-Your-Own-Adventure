@@ -1,5 +1,53 @@
 # Studio North: Choose Your Own Adventure: a tier-aware member-composition forecast
 
+> ## ⭐ Start here: the best model
+>
+> **The submitted (best) model is what `main.py` runs.** That is the `SELECTED` four-member ensemble defined in [`model.py`](model.py): sBG retention plus tier-aware cash per survivor. There is nothing to configure. Every other model in this repo is a tested comparison and is used only by `validation/`.
+>
+> | What you want | Where it is |
+> |---|---|
+> | Run the best model | `uv sync --frozen`, then `uv run --frozen python main.py --data-dir DATA --prediction-grid prediction_grid.csv --output outputs/predictions.csv --seed 20261116` |
+> | Its 2026 forecast, already computed | [`predictions/selected_model_2026.csv`](predictions/selected_model_2026.csv) (SHA-256 `92e59411…`, receipt alongside) |
+> | The released reference forecast, same grid | [`predictions/reference_sbg_gamma_2026.csv`](predictions/reference_sbg_gamma_2026.csv) |
+> | Model definition | [`model.py`](model.py): `SELECTED` (retention members) + `Cash` (tier-aware cash block) |
+> | Backtest scores for every model | [`validation/results/backtest_summary.csv`](validation/results/backtest_summary.csv) and [`backtest_by_origin.csv`](validation/results/backtest_by_origin.csv) |
+> | **Compare your team's model with ours** | [`validation/compare_model.py`](validation/compare_model.py) (see [Comparing models in class](#comparing-models-in-class)) |
+>
+> **Backtest leaderboard.** Cohort-month contribution WAPE (the challenge's primary score), over five historical origins, using only released data. Lower is better.
+>
+> | Rank | Model | Mean | Worst | Mean abs. bias |
+> |---:|---|---:|---:|---:|
+> | **1** | **Studio North: Choose Your Own Adventure: selected ensemble (`main.py`)** | **5.6%** | **8.2%** | **2.9%** |
+> | 2 | Our first pass (2-member sBG + tier-aware cash) | 6.3% | 11.5% | 3.3% |
+> | 3 | Teammate BdW + log-linear cash model | 8.6% | 20.3% | 6.2% |
+> | 4 | Released reference: hierarchical sBG + Gamma | 9.2% | 16.5% | 7.8% |
+> | 5 | Template constant-hazard example | 37.0% | 45.5% | 36.9% |
+>
+> Backtest accuracy is evidence, not a guarantee: the private 2026 holdout decides the challenge.
+
+## Comparing models in class
+
+Two ways to put another team's model next to ours:
+
+**1. Same backtest, same rules (accuracy).** Point the script at the other team's repository. It must have the standard `main.py` and `uv.lock`. For each of six historical origins, the script writes the truncated observed CSVs and grid, runs their model through their own locked environment (exactly as the instructor does), scores it, and prints a leaderboard with ours:
+
+```text
+cd /path/to/their-repo && uv sync --frozen
+cd /path/to/this-repo
+uv run --frozen python validation/compare_model.py --data-dir /path/to/released/data --repo /path/to/their-repo --name "Team X"
+```
+
+Runs that fail are reported with a reason, not skipped. This executes the other team's code on your machine, so read it first.
+
+**2. 2026 forecasts side by side (differences, not accuracy).** No 2026 outcomes exist yet. This shows how two forecasts differ in totals and by cohort:
+
+```text
+uv run --frozen python validation/compare_model.py --compare-2026 predictions/selected_model_2026.csv /path/to/their/predictions.csv
+```
+
+---
+
+
 Team submission for the optional Studio North private-holdout model challenge
 (`submission-contract.json`, contract `studio-north-forecast/1.0`, dataset 5.1).
 
@@ -464,7 +512,9 @@ cd customer-economics-lab && uv run --frozen python ../<team-repo>/validation/re
 | `panel.py` | Canonical cohort definitions, historical truncation, grid construction |
 | `pyproject.toml`, `uv.lock` | Locked Python 3.12 environment (pandas, numpy, scipy) |
 | `submission-contract.json`, `prediction_grid.csv` | Unmodified challenge contract and public grid |
+| `predictions/` | Committed 2026 forecasts: the selected model (with run receipt) and the released reference |
 | `validation/` | Origins, backtest, reference refit scripts, results and fitted settings |
+| `validation/compare_model.py` | Score any team's `main.py` on our six-origin backtest, or diff two 2026 forecasts |
 | `scaffold-receipt.json` | Hashes of the released scaffold this project started from |
 
 ## References
