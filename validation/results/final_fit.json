@@ -266,6 +266,276 @@
           }
         }
       ]
+    },
+    "sbg_cohort_trend_period": {
+      "converged": true,
+      "cells": [
+        {
+          "channel": "search",
+          "primary_need": "save_time",
+          "cohort": "2024-01-01",
+          "alpha": 0.7953237860697385,
+          "beta": 2.389999787217269,
+          "monthly_churn_at_age": {
+            "1": 0.24968382890188612,
+            "6": 0.09716461163066246,
+            "12": 0.056066665096554155,
+            "23": 0.03157885916198073,
+            "24": 0.030372883643915955,
+            "30": 0.024710759370144292,
+            "35": 0.0213881098681917
+          }
+        },
+        {
+          "channel": "search",
+          "primary_need": "save_time",
+          "cohort": "2025-12-01",
+          "alpha": 0.497491592673726,
+          "beta": 2.6878319806132813,
+          "monthly_churn_at_age": {
+            "1": 0.15618243523070197,
+            "6": 0.060778488256382206,
+            "12": 0.035070866737969116,
+            "23": 0.0197532341097813,
+            "24": 0.018998871305957045,
+            "30": 0.01545709464566738,
+            "35": 0.013378708180210742
+          }
+        },
+        {
+          "channel": "search",
+          "primary_need": "build_skill",
+          "cohort": "2024-01-01",
+          "alpha": 0.5853225996575312,
+          "beta": 4.535001576007968,
+          "monthly_churn_at_age": {
+            "1": 0.114313582417163,
+            "6": 0.05783634886567634,
+            "12": 0.036309604774642595,
+            "23": 0.021582433744753604,
+            "24": 0.020814930724164536,
+            "30": 0.01715466115280906,
+            "35": 0.014962110156071531
+          }
+        },
+        {
+          "channel": "search",
+          "primary_need": "build_skill",
+          "cohort": "2025-12-01",
+          "alpha": 0.34296018300261427,
+          "beta": 4.777363992662885,
+          "monthly_churn_at_age": {
+            "1": 0.06698016985575724,
+            "6": 0.03388826059813979,
+            "12": 0.021275017751834754,
+            "23": 0.012645873286070338,
+            "24": 0.012196167471618282,
+            "30": 0.01005149251328632,
+            "35": 0.008766803195765883
+          }
+        },
+        {
+          "channel": "partner",
+          "primary_need": "save_time",
+          "cohort": "2024-01-01",
+          "alpha": 0.7239369206720264,
+          "beta": 2.8524876107570667,
+          "monthly_churn_at_age": {
+            "1": 0.20241917991283623,
+            "6": 0.08441010796738088,
+            "12": 0.04966491742272607,
+            "23": 0.028304852376157694,
+            "24": 0.027239816244502498,
+            "30": 0.02222272490259338,
+            "35": 0.01926572125207223
+          }
+        },
+        {
+          "channel": "partner",
+          "primary_need": "save_time",
+          "cohort": "2025-12-01",
+          "alpha": 0.4424015643179642,
+          "beta": 3.134022967111129,
+          "monthly_churn_at_age": {
+            "1": 0.12369939877948065,
+            "6": 0.05158344980437323,
+            "12": 0.03035048570135153,
+            "23": 0.01729724042445233,
+            "24": 0.016646391383264503,
+            "30": 0.013580421138333534,
+            "35": 0.011773381045020345
+          }
+        },
+        {
+          "channel": "partner",
+          "primary_need": "build_skill",
+          "cohort": "2024-01-01",
+          "alpha": 0.556162097301288,
+          "beta": 5.192846620146688,
+          "monthly_churn_at_age": {
+            "1": 0.09674052078114982,
+            "6": 0.051740780189201585,
+            "12": 0.03320567244806039,
+            "23": 0.02004259333961587,
+            "24": 0.019345435620664302,
+            "30": 0.016005121234494796,
+            "35": 0.01399184823085087
+          }
+        },
+        {
+          "channel": "partner",
+          "primary_need": "build_skill",
+          "cohort": "2025-12-01",
+          "alpha": 0.3232186409174042,
+          "beta": 5.425790076530571,
+          "monthly_churn_at_age": {
+            "1": 0.056221629989262556,
+            "6": 0.030069623107919666,
+            "12": 0.019297777341335698,
+            "23": 0.011647934677903503,
+            "24": 0.011242775154234403,
+            "30": 0.00930152119001617,
+            "35": 0.008131489346438345
+          }
+        }
+      ],
+      "calendar_drift_per_year_log_multiplier": -0.06631616518495931,
+      "calendar_drift_note": "estimated jointly; held at the December 2025 level in forecasts"
+    },
+    "sbg_no_cohort_effect_period": {
+      "converged": true,
+      "cells": [
+        {
+          "channel": "search",
+          "primary_need": "save_time",
+          "cohort": "2024-01-01",
+          "alpha": 0.6294759038636956,
+          "beta": 3.361412652169703,
+          "monthly_churn_at_age": {
+            "1": 0.15772825901441315,
+            "6": 0.07001264668565844,
+            "12": 0.04199056657054135,
+            "23": 0.024219099031825106,
+            "24": 0.023321792558140333,
+            "30": 0.019080295542647813,
+            "35": 0.016569128224922895
+          }
+        },
+        {
+          "channel": "search",
+          "primary_need": "save_time",
+          "cohort": "2025-12-01",
+          "alpha": 0.6294759038636956,
+          "beta": 3.361412652169703,
+          "monthly_churn_at_age": {
+            "1": 0.15772825901441315,
+            "6": 0.07001264668565844,
+            "12": 0.04199056657054135,
+            "23": 0.024219099031825106,
+            "24": 0.023321792558140333,
+            "30": 0.019080295542647813,
+            "35": 0.016569128224922895
+          }
+        },
+        {
+          "channel": "search",
+          "primary_need": "build_skill",
+          "cohort": "2024-01-01",
+          "alpha": 0.5129866491626937,
+          "beta": 7.031251287395195,
+          "monthly_churn_at_age": {
+            "1": 0.06799714609700319,
+            "6": 0.04089420591008479,
+            "12": 0.02766285953176919,
+            "23": 0.017363340028070405,
+            "24": 0.016794874706916107,
+            "30": 0.014037415421091826,
+            "35": 0.012347961465705137
+          }
+        },
+        {
+          "channel": "search",
+          "primary_need": "build_skill",
+          "cohort": "2025-12-01",
+          "alpha": 0.5129866491626937,
+          "beta": 7.031251287395195,
+          "monthly_churn_at_age": {
+            "1": 0.06799714609700319,
+            "6": 0.04089420591008479,
+            "12": 0.02766285953176919,
+            "23": 0.017363340028070405,
+            "24": 0.016794874706916107,
+            "30": 0.014037415421091826,
+            "35": 0.012347961465705137
+          }
+        },
+        {
+          "channel": "partner",
+          "primary_need": "save_time",
+          "cohort": "2024-01-01",
+          "alpha": 0.5784141907899275,
+          "beta": 4.01860628415053,
+          "monthly_churn_at_age": {
+            "1": 0.12582371428254743,
+            "6": 0.060270184095185995,
+            "12": 0.037084915783707345,
+            "23": 0.021747330357357222,
+            "24": 0.02095929853424411,
+            "30": 0.017216234731926617,
+            "35": 0.014985980359946895
+          }
+        },
+        {
+          "channel": "partner",
+          "primary_need": "save_time",
+          "cohort": "2025-12-01",
+          "alpha": 0.5784141907899275,
+          "beta": 4.01860628415053,
+          "monthly_churn_at_age": {
+            "1": 0.12582371428254743,
+            "6": 0.060270184095185995,
+            "12": 0.037084915783707345,
+            "23": 0.021747330357357222,
+            "24": 0.02095929853424411,
+            "30": 0.017216234731926617,
+            "35": 0.014985980359946895
+          }
+        },
+        {
+          "channel": "partner",
+          "primary_need": "build_skill",
+          "cohort": "2024-01-01",
+          "alpha": 0.497743352186155,
+          "beta": 8.192305436509944,
+          "monthly_churn_at_age": {
+            "1": 0.05727739444151483,
+            "6": 0.03635804078340089,
+            "12": 0.025278929347899968,
+            "23": 0.01621839559829845,
+            "24": 0.015706613628303615,
+            "30": 0.013206227324795273,
+            "35": 0.011659470211660658
+          }
+        },
+        {
+          "channel": "partner",
+          "primary_need": "build_skill",
+          "cohort": "2025-12-01",
+          "alpha": 0.497743352186155,
+          "beta": 8.192305436509944,
+          "monthly_churn_at_age": {
+            "1": 0.05727739444151483,
+            "6": 0.03635804078340089,
+            "12": 0.025278929347899968,
+            "23": 0.01621839559829845,
+            "24": 0.015706613628303615,
+            "30": 0.013206227324795273,
+            "35": 0.011659470211660658
+          }
+        }
+      ],
+      "calendar_drift_per_year_log_multiplier": -0.33331460647323957,
+      "calendar_drift_note": "estimated jointly; held at the December 2025 level in forecasts"
     }
   },
   "cash": {
@@ -307,6 +577,11 @@
   "origin_premium_share": 0.5517126704356502,
   "forecast_2026_totals": {
     "selected": {
+      "predicted_retained": 28252.005816063633,
+      "predicted_net_revenue": 2138279.71844714,
+      "predicted_contribution": 1056511.583437767
+    },
+    "first_pass_ensemble": {
       "predicted_retained": 27937.12453254892,
       "predicted_net_revenue": 2114801.807489251,
       "predicted_contribution": 1044927.6849809259
@@ -324,64 +599,64 @@
   },
   "forecast_by_month": {
     "2026-01-01": {
-      "predicted_retained": 2835.803965952605,
-      "predicted_net_revenue": 201176.21812677404,
-      "predicted_contribution": 96564.53082116946
+      "predicted_retained": 2845.2668751268006,
+      "predicted_net_revenue": 201805.40741086364,
+      "predicted_contribution": 96860.72409112549
     },
     "2026-02-01": {
-      "predicted_retained": 2697.8733652900837,
-      "predicted_net_revenue": 194733.78630206033,
-      "predicted_contribution": 94141.67463900844
+      "predicted_retained": 2713.5680831515824,
+      "predicted_net_revenue": 195807.3938391535,
+      "predicted_contribution": 94652.68429112712
     },
     "2026-03-01": {
-      "predicted_retained": 2582.084053785227,
-      "predicted_net_revenue": 189182.8633884556,
-      "predicted_contribution": 92036.13383937269
+      "predicted_retained": 2602.20974208946,
+      "predicted_net_revenue": 190591.42448637873,
+      "predicted_contribution": 92712.59206066559
     },
     "2026-04-01": {
-      "predicted_retained": 2482.319593821236,
-      "predicted_net_revenue": 184304.34815176006,
-      "predicted_contribution": 90177.69696572816
+      "predicted_retained": 2505.744607920368,
+      "predicted_net_revenue": 185975.81234160223,
+      "predicted_contribution": 90986.58508633405
     },
     "2026-05-01": {
-      "predicted_retained": 2394.777511328898,
-      "predicted_net_revenue": 179948.6598634895,
-      "predicted_contribution": 88513.82230677857
+      "predicted_retained": 2420.735888079253,
+      "predicted_net_revenue": 181832.21402280254,
+      "predicted_contribution": 89431.54103083794
     },
     "2026-06-01": {
-      "predicted_retained": 2316.901856973097,
-      "predicted_net_revenue": 176012.07272186247,
-      "predicted_contribution": 87007.0958896108
+      "predicted_retained": 2344.848137268623,
+      "predicted_net_revenue": 178070.1418970391,
+      "predicted_contribution": 88015.98869662787
     },
     "2026-07-01": {
-      "predicted_retained": 2246.8785526882243,
-      "predicted_net_revenue": 172419.9649603888,
-      "predicted_contribution": 85630.31430727441
+      "predicted_retained": 2276.4096316976415,
+      "predicted_net_revenue": 174623.78835254404,
+      "predicted_contribution": 86716.72382503943
     },
     "2026-08-01": {
-      "predicted_retained": 2183.3672168237167,
-      "predicted_net_revenue": 169116.84052996527,
-      "predicted_contribution": 84363.15449858685
+      "predicted_retained": 2214.176627608805,
+      "predicted_net_revenue": 171443.81937260658,
+      "predicted_contribution": 85516.24654201062
     },
     "2026-09-01": {
-      "predicted_retained": 2125.346223178473,
-      "predicted_net_revenue": 166060.2588422345,
-      "predicted_contribution": 83190.04675100493
+      "predicted_retained": 2157.1956870522454,
+      "predicted_net_revenue": 168492.26729229218,
+      "predicted_contribution": 84401.05509304556
     },
     "2026-10-01": {
-      "predicted_retained": 2072.0173597617586,
-      "predicted_net_revenue": 163216.99506583574,
-      "predicted_contribution": 82098.79645201114
+      "predicted_retained": 2104.71821323157,
+      "predicted_net_revenue": 165739.25251892966,
+      "predicted_contribution": 83360.51468525855
     },
     "2026-11-01": {
-      "predicted_retained": 2022.7441972475945,
-      "predicted_net_revenue": 160560.5185078577,
-      "predicted_contribution": 81079.6668404126
+      "predicted_retained": 2056.144793884467,
+      "predicted_net_revenue": 163160.80775767134,
+      "predicted_contribution": 82386.09347752816
     },
     "2026-12-01": {
-      "predicted_retained": 1977.010635698008,
-      "predicted_net_revenue": 158069.28102856685,
-      "predicted_contribution": 80124.75166996793
+      "predicted_retained": 2010.9875289528184,
+      "predicted_net_revenue": 160737.38915525633,
+      "predicted_contribution": 81470.83455816665
     }
   }
 }

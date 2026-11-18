@@ -43,6 +43,11 @@ class Config:
     cohort_trend: bool = True               # linear acquisition-cohort trend
     cohort_ridge: float = 0.0               # precision of cohort intercepts (0 = none)
     cohort_rw: float = 0.0                  # random-walk precision across cohort effects (0 = none)
+    heterogeneity: str = 'beta'             # 'beta' (sBG/BdW) or 'latent2' (two-class geometric)
+    churn_event: str = 'all'                # 'all', or 'split' = cancelled and failed hazards fitted separately
+    trial_halflife: float | None = None     # exponential recency weighting of renewal trials (months)
+    period_effect: bool = False             # calendar drift fitted, frozen at the origin when forecasting
+    period_forecast: str = 'frozen'         # 'frozen' (selected) or 'extrapolate' (sensitivity check)
     calendar_trend: bool = False            # linear calendar-month trend in hazard
     hazard_window: int | None = None        # use only trials in the last N months
     # Cash per member
@@ -202,9 +207,25 @@ class MixtureHazard:
         xw = np.column_stack([np.ones(len(frame)), f['build']])
         return xm, xc, xw
 
-    def _hazard(self, params, xm, xc, xw, age):
+    def _hazard(self, params, xm, xc, xw, age, period=None):
         from scipy.special import betaln, expit
         km, kc = xm.shape[1], xc.shape[1]
+        if self.c.period_effect:
+            gamma, params = params[-1], params[:-1]
+        if self.c.heterogeneity == 'latent2':
+            eta = xm @ params[:km]
+            pi = expit(xc @ params[km:km + kc])
+            th1, th2 = expit(eta), expit(eta - np.exp(params[km + kc]))
+            s1, s2 = pi * (1 - th1) ** (age - 1), (1 - pi) * (1 - th2) ** (age - 1)
+            h = (s1 * th1 + s2 * th2) / (s1 + s2)
+        else:
+            h = self._beta_hazard(params, xm, xc, xw, age, km, kc)
+        if self.c.period_effect and period is not None:
+            h = -np.expm1(np.exp(gamma * period) * np.log1p(-np.clip(h, 1e-12, 1 - 1e-12)))
+        return np.clip(h, 1e-12, 1 - 1e-12)
+
+    def _beta_hazard(self, params, xm, xc, xw, age, km, kc):
+        from scipy.special import betaln, expit
         mu = expit(xm @ params[:km])
         phi = np.exp(xc @ params[km:km + kc])
         a, b = mu * phi, (1 - mu) * phi
@@ -213,16 +234,23 @@ class MixtureHazard:
             t1, t0 = age ** cw, (age - 1) ** cw
         else:
             t1, t0 = age, age - 1
-        h = -np.expm1(betaln(a, b + t1) - betaln(a, b + t0))
-        return np.clip(h, 1e-12, 1 - 1e-12)
+        return -np.expm1(betaln(a, b + t1) - betaln(a, b + t0))
 
-    def fit(self, sp: pd.DataFrame) -> 'MixtureHazard':
-        trials = sp[sp.age >= 1]
+    def fit(self, sp: pd.DataFrame, event: str = 'all') -> 'MixtureHazard':
+        trials = sp[sp.age >= 1].copy()
+        trials['event'] = (~trials.paid if event == 'all' else trials.renewal_outcome.eq(event)).astype(float)
+        trials['w'] = (0.5 ** ((self.origin - trials.month) / self.c.trial_halflife)
+                       if self.c.trial_halflife else 1.0)
+        trials['wn'] = trials.w
+        trials['we'] = trials.w * trials.event
         g = (trials.groupby(['cohort_index', 'channel', 'primary_need', 'age'])
-             .agg(n=('paid', 'size'), paid=('paid', 'sum')).reset_index())
+             .agg(n=('wn', 'sum'), churn=('we', 'sum')).reset_index())
         xm, xc, xw = self._designs(g)
-        age = g.age.to_numpy(float); n = g.n.to_numpy(float); churn = n - g.paid.to_numpy(float)
-        km, kc, kw = xm.shape[1], xc.shape[1], (xw.shape[1] if self.weibull else 0)
+        age = g.age.to_numpy(float); n = g.n.to_numpy(float); churn = g.churn.to_numpy(float)
+        period = (g.cohort_index.to_numpy(float) + age - self.origin) / 12.0
+        km, kc = xm.shape[1], xc.shape[1]
+        kw = (xw.shape[1] if self.weibull else 0) + (1 if self.c.heterogeneity == 'latent2' else 0)
+        kw += 1 if self.c.period_effect else 0
         k = self.origin + 1
         n_fixed = km - (k if (self.c.cohort_ridge > 0 or self.c.cohort_rw > 0) else 0)
         P = np.zeros((km + kc + kw, km + kc + kw))
@@ -237,11 +265,12 @@ class MixtureHazard:
             P[n_fixed:km, n_fixed:km] = block
 
         def nll(p):
-            h = self._hazard(p, xm, xc, xw, age)
+            h = self._hazard(p, xm, xc, xw, age, period)
             return -(churn * np.log(h) + (n - churn) * np.log1p(-h)).sum() + 0.5 * p @ P @ p
 
         start = np.zeros(km + kc + kw)
-        start[0] = -2.0; start[km] = np.log(4.0)
+        start[0] = -2.0
+        start[km] = 0.0 if self.c.heterogeneity == 'latent2' else np.log(4.0)
         result = minimize(nll, start, method='L-BFGS-B',
                           options={'maxiter': 20000, 'maxfun': 200000, 'ftol': 1e-13, 'gtol': 1e-8})
         if not np.isfinite(result.x).all():
@@ -252,7 +281,27 @@ class MixtureHazard:
 
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
         xm, xc, xw = self._designs(frame)
-        return self._hazard(self.params, xm, xc, xw, frame.age.to_numpy(float))
+        # Calendar drift is held at its origin level (period = 0) unless the
+        # sensitivity option asks to extend it.
+        period = None
+        if self.c.period_effect and self.c.period_forecast == 'extrapolate':
+            period = (frame.month.to_numpy(float) - self.origin) / 12.0
+        return self._hazard(self.params, xm, xc, xw, frame.age.to_numpy(float), period)
+
+
+class SplitHazard:
+    """Voluntary (cancelled) and involuntary (failed payment) churn as competing risks."""
+
+    def __init__(self, config: Config, origin: int):
+        self.parts = [MixtureHazard(config, origin), MixtureHazard(config, origin)]
+
+    def fit(self, sp):
+        self.parts[0].fit(sp, 'cancelled'); self.parts[1].fit(sp, 'failed')
+        self.converged = all(p.converged for p in self.parts)
+        return self
+
+    def predict(self, frame):
+        return np.clip(self.parts[0].predict(frame) + self.parts[1].predict(frame), 0, 1 - 1e-9)
 
 
 # ----------------------------------------------------------------------------
@@ -365,13 +414,19 @@ class Cash:
 # Forecast
 # ----------------------------------------------------------------------------
 
-# Final specification, fixed before the submission run. Two sBG retention
-# variants that tied in chronological validation are averaged with equal
-# weights: one carries a linear acquisition-cohort trend in mean churn, the
-# other assumes cohorts share mean churn after need and channel. Both use the
-# same tier-aware cash block.
+# Final specification (second pass), fixed before the submission run. Four
+# sBG retention members are averaged with equal weights, sharing one
+# tier-aware cash block. They span two unresolved identification choices:
+#   * cohort quality: a linear acquisition-cohort trend, or none;
+#   * calendar drift: none, or a calendar-time multiplier on the hazard that is
+#     estimated jointly and then held at its December-2025 level (never
+#     extrapolated). With two years of data, tenure, cohort and calendar
+#     effects are not separately identified, so the ensemble hedges across them.
 SELECTED = {'sbg_cohort_trend': Config(hazard_kind='sbg', cohort_trend=True),
-            'sbg_no_cohort_effect': Config(hazard_kind='sbg', cohort_trend=False)}
+            'sbg_no_cohort_effect': Config(hazard_kind='sbg', cohort_trend=False),
+            'sbg_cohort_trend_period': Config(hazard_kind='sbg', cohort_trend=True, period_effect=True),
+            'sbg_no_cohort_effect_period': Config(hazard_kind='sbg', cohort_trend=False, period_effect=True)}
+FIRST_PASS = {k: SELECTED[k] for k in ['sbg_cohort_trend', 'sbg_no_cohort_effect']}
 PREDICTIONS = ['predicted_retained', 'predicted_net_revenue', 'predicted_contribution']
 
 
@@ -389,7 +444,12 @@ def forecast(tables: dict[str, pd.DataFrame], grid: pd.DataFrame, config: Config
     first_future = int(panel.month_index(grid.calendar_month).min())
     cutoff = panel.index_to_month([first_future])[0]
     origin, acq, sp, tx = _history(tables, cutoff)
-    hazard = (Hazard if config.hazard_kind == 'logit' else MixtureHazard)(config, origin).fit(sp)
+    if config.hazard_kind == 'logit':
+        hazard = Hazard(config, origin).fit(sp)
+    elif config.churn_event == 'split':
+        hazard = SplitHazard(config, origin).fit(sp)
+    else:
+        hazard = MixtureHazard(config, origin).fit(sp)
     cash = Cash(config, origin).fit(sp, tx)
 
     # Survivors at the origin and their plan tier.

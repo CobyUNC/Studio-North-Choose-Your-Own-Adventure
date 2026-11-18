@@ -21,20 +21,33 @@ import pandas as pd  # noqa: E402
 import origins  # noqa: E402
 import panel  # noqa: E402
 import example_constant_hazard  # noqa: E402
-from model import Config, SELECTED, forecast, forecast_ensemble  # noqa: E402
+from model import Config, FIRST_PASS, SELECTED, forecast, forecast_ensemble  # noqa: E402
 
-# Every variant shares the panel, origins and score. The first block compares
-# retention forms; the second removes one cash component at a time from the
-# selected model (ablations, not tuning).
+# Every variant shares the panel, origins and score. Retention forms and
+# research-driven variants are compared like-for-like; ablations remove one
+# cash component at a time from the selected model.
 SELECTED_RUN = lambda t, g: forecast_ensemble(t, g)
+mod = lambda **kw: {k: Config(**{**v.__dict__, **kw}) for k, v in FIRST_PASS.items()}
 VARIANTS = {
     'selected_ensemble': SELECTED_RUN,
+    # First-pass selection and its members
+    'first_pass_ensemble': FIRST_PASS,
     'sbg_cohort_trend': Config(hazard_kind='sbg', cohort_trend=True),
     'sbg_no_cohort_effect': Config(hazard_kind='sbg', cohort_trend=False),
+    # Retention forms
     'sbg_cohort_random_walk': Config(hazard_kind='sbg', cohort_trend=False, cohort_rw=10.0),
     'bdw_cohort_trend': Config(hazard_kind='bdw', cohort_trend=True),
     'logit_hazard_cohort_ridge': Config(hazard_kind='logit', cohort_ridge=4.0),
     'example_constant_hazard': lambda t, g: example_constant_hazard.predict(t, g, seed=0),
+    # Second-pass, research-driven variants (each applied to the first-pass ensemble)
+    'r2_period_frozen': mod(period_effect=True),
+    'r2_period_extrapolated': mod(period_effect=True, period_forecast='extrapolate'),
+    'r2_voluntary_involuntary_split': mod(churn_event='split'),
+    'r2_latent_class_heterogeneity': mod(heterogeneity='latent2'),
+    'r2_cohort_partial_pooling': mod(cohort_ridge=4.0),
+    'r2_recency_weight_halflife12': mod(trial_halflife=12.0),
+    'r2_plus_bdw_member': {**FIRST_PASS, 'bdw': Config(hazard_kind='bdw', cohort_trend=True)},
+    # Ablations of the selected ensemble's cash block
     'ablation_no_tier_mix': {k: Config(**{**v.__dict__, 'tier_aware': False}) for k, v in SELECTED.items()},
     'ablation_flat_costs': {k: Config(**{**v.__dict__, 'cost_trend': 'flat'}) for k, v in SELECTED.items()},
     'ablation_no_addon_trends': {k: Config(**{**v.__dict__, 'addon_calendar_trend': False,

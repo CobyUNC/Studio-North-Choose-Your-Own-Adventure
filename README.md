@@ -7,9 +7,17 @@ Team submission for the optional Studio North private-holdout model challenge
 stays*, but replace the reference's cell-level Gamma revenue curve with a
 structural model of *what the actual survivors pay*. That model follows each
 survivor's observed plan tier, upgrades, add-ons, refunds and the falling
-variable cost. In chronological validation it cut cohort-month contribution
-WAPE from **9.2% (reference) to 6.3%**, and it beat the reference at all six
-historical origins.
+variable cost.
+
+In chronological validation it cut cohort-month contribution WAPE from
+**9.2% (reference) to 5.6%**. Worst-case error across historical origins
+fell from 16.5% to 8.2%, and mean absolute bias from 7.8% to 2.9%.
+
+The model was built in two passes:
+1. **First pass:** the cash block and an sBG retention ensemble (6.3% WAPE).
+2. **Second pass:** a research review of industry practice and open-source
+   implementations, which led to calendar-drift members and ten more tested
+   variants. See §6.
 
 ```text
 uv sync --frozen
@@ -19,7 +27,7 @@ uv run --frozen python main.py --data-dir /path/to/released/data --prediction-gr
 The command fits the model from the eight observed CSVs and writes the 1,152
 forecast rows plus a `.receipt.json` (input, code, lock and output hashes).
 On the 4-core development machine the full fit and forecast took about
-**3 seconds**, against the 60-minute contract budget. It needs no GPU, no
+**4 seconds**, against the 60-minute contract budget. It needs no GPU, no
 network and no precomputed artifacts. The model is deterministic: the seed is
 accepted and recorded, and repeated runs produce identical bytes (see
 [Reproducibility](#reproducibility-evidence)).
@@ -57,18 +65,21 @@ families are:
 
 | Family | Idea | Strengths | Weaknesses here |
 |---|---|---|---|
-| **sBG** (Fader & Hardie 2007) | Each customer has a constant churn probability θ ~ Beta(α, β). The aggregate hazard falls as high-θ customers leave | Two parameters per segment; principled extrapolation; well documented on subscription data | Ignores individual duration dependence; says nothing about revenue per member |
-| **Beta-discrete-Weibull** (Fader, Hardie, Liu, Davin & Steenburgh 2018) | sBG plus individual duration dependence c (θ applied to t^c) | Separates sorting from "lock-in" | One more parameter; weakly identified with short histories |
-| **Discrete-time hazard regression** (logit or cloglog on person-periods) | Flexible tenure terms plus covariates, including time-varying ones | Uses customer-level signals; easy to fit | Parametric tenure terms extrapolate poorly; time-varying covariates must themselves be forecast |
-| **Hierarchical Bayesian sBG + Gamma revenue** (released reference, adapting Orduz 2024) | Cohort-pooled sBG retention; Gamma revenue per retained member with a log-age mean | Coherent uncertainty; pools sparse cells | Revenue per member is a smooth age curve at cell level, blind to *which* plans the survivors hold |
-| **Machine learning / neural** (gradient boosting, Bayesian neural nets as in Orduz) | Learn hazard or revenue surfaces | Captures interactions | Flat or erratic outside observed ages; needs much more data than 5,703 customers |
+| **sBG** (Fader & Hardie 2007) | Each customer has a constant churn probability θ ~ Beta(α, β). The aggregate hazard falls as high-θ customers leave | Two parameters per segment; principled extrapolation; well documented on subscription data | Ignores individual duration dependence and calendar shocks; says nothing about revenue per member |
+| **Beta-discrete-Weibull** (Fader, Hardie, Liu, Davin & Steenburgh 2018) | sBG plus individual duration dependence c (θ applied to t^c) | Separates sorting from "lock-in"; sBG is the c = 1 case | One more parameter; weakly identified with short histories. The authors conclude heterogeneity matters more than individual dynamics |
+| **Latent-class geometric** (e.g. the `foretell` R package's latent-class models) | A few discrete churn types instead of a Beta distribution | Simple; can fit sharp early drops | Tail depends on the slowest class; unstable with few ages |
+| **Discrete-time hazard regression** (logit/cloglog on person-periods) | Flexible tenure terms plus covariates, including time-varying ones | Uses customer-level signals; easy to fit | Parametric tenure terms extrapolate poorly; time-varying covariates must themselves be forecast |
+| **Cohort × age × calendar models** (Orduz 2024–25: BART or neural retention on cohort age, age and month, with a linked revenue model) | Retention surface over the cohort-age-period plane | Captures calendar shocks and seasonality | Flexible learners are flat or erratic outside the observed ages |
+| **Hierarchical Bayesian sBG + Gamma revenue** (released reference, adapting Orduz) | Cohort-pooled sBG retention; Gamma revenue per retained member with a log-age mean | Coherent uncertainty; pools sparse cells | Revenue per member is a smooth age curve at cell level, blind to *which* plans the survivors hold |
+| **Markov-chain migration models** (Pfeifer & Carraway 2000) | Customers move between value states (e.g. plan tiers) and an absorbing churn state | Natural for upgrades and downgrades | Needs a state definition that predicts value |
 | **Customer-base valuation** (Gupta, Lehmann & Stuart 2004; Fader & Hardie 2010; McCarthy, Fader & Hardie 2017) | Retention × margin, summed over the remaining base | Links CLV to firm value | Margin is usually assumed constant per customer |
 
 The literature's main warning, which the reference already respects, is that
 heterogeneity makes the aggregate hazard fall with tenure. Ignoring it
 under-values the remaining base (Fader & Hardie 2010). Our exploratory work
 showed that **for this business the larger forecasting error sits on the
-margin side**. That is where we put the alternative.
+margin side**. That is where the first-pass alternative went. The second
+pass (§6) then revisited retention.
 
 ## 3. The reference model and why we changed the cash block
 
@@ -89,7 +100,8 @@ oldest observed age. Fitting uses NUTS on CPU.
 2. **Standard members upgrade, and premium never downgrades.** About 7–8%
    of renewing standard members move to premium each month, at every tenure.
    The survivors' premium share rose from 20% at acquisition to 55% in
-   December 2025.
+   December 2025. This is a two-state Markov migration in the sense of
+   Pfeifer & Carraway (2000).
 3. **Tier does not predict churn** once tenure, need, channel and cohort are
    controlled for (logit coefficient −0.03, z = −0.7). Product events,
    support contacts, feedback ratings and demographics were also not
@@ -109,21 +121,6 @@ decomposition below confirms the result: the reference forecasts retention
 well but under-forecasts **contribution per retained member by 6–9% at
 every origin**.
 
-### Alternatives considered
-
-We stated three candidates, with assumptions, before fitting:
-
-- **A. Person-level logistic discrete-time hazard.** Uses log-tenure, a
-  first-renewal indicator, need × channel, need × tenure, a cohort trend and
-  ridge-pooled cohort intercepts. Behavioural covariates were dropped
-  because they had no predictive power (finding 3).
-- **B. Beta-discrete-Weibull retention.** Tests whether individual-level
-  duration dependence improves extrapolation.
-- **C. sBG retention (as the reference) + tier-aware cash block.** Selected.
-
-Each retention form was paired with the same cash block, so the comparison
-isolates retention. Ablations then remove one cash component at a time.
-
 ## 4. Selected model
 
 All parameters are estimated at run time from the supplied tables by
@@ -131,27 +128,40 @@ penalized maximum likelihood (scipy L-BFGS). Code is in `model.py`; the data
 preparation in `panel.py` reproduces the lab's canonical SQL and matched the
 lab's `cohort_age_summary` on all 1,200 cell-months.
 
-### Retention: sBG ensemble
+### Retention: four-member sBG ensemble
 
 For a cell with need n, channel c and cohort k, renewal t (t ≥ 1) fails with
 probability
 
   h(t) = 1 − B(α, β + t) / B(α, β + t − 1) = α / (α + β + t − 1),
 
-where α = μφ and β = (1 − μ)φ. Two specifications tied in validation. Their
-forecasts are **averaged with equal weights**, which keeps expected
-membership monotone:
+where α = μφ and β = (1 − μ)φ. With two years of data, tenure, acquisition
+cohort and calendar time cannot be cleanly separated (the age-period-cohort
+problem): calendar month = cohort + age. Rather than bet on one resolution,
+four members span the two open choices, and their forecasts are **averaged
+with equal weights**. That keeps expected membership monotone and follows
+the forecast-combination finding that simple averages are hard to beat when
+weights would be estimated from little data.
 
-| Member | logit μ | log φ |
+| Member | logit μ | Calendar drift |
 |---|---|---|
-| `sbg_cohort_trend` | need + channel + need×channel + linear cohort trend | need + channel |
-| `sbg_no_cohort_effect` | need + channel + need×channel | need + channel |
+| `sbg_cohort_trend` | need + channel + need×channel + linear cohort trend | none |
+| `sbg_no_cohort_effect` | need + channel + need×channel | none |
+| `sbg_cohort_trend_period` | as `sbg_cohort_trend` | fitted, frozen at Dec 2025 |
+| `sbg_no_cohort_effect_period` | as `sbg_no_cohort_effect` | fitted, frozen at Dec 2025 |
 
-The two members disagree about whether recent cohorts' better early
-retention will persist, so the average hedges a real identification problem.
-In validation the trend member won at four origins and the no-cohort member
-at two, including the 2025-01 origin where the trend member missed most. Expected survivors are propagated from each cell's *observed*
-December 2025 survivors (`origin_retained`): S(m) = S(m−1)·(1 − h(age_m)).
+In every member, log φ depends on need and channel.
+
+**Calendar drift.** The calendar-drift members multiply each renewal's
+hazard by exp(γ·(month − origin)/12), so that 1 − h becomes (1 − h)^exp(γ·…).
+γ is estimated jointly with the sBG parameters. The drift is **never
+extrapolated**: forecasts use the December 2025 level (multiplier 1). Its
+job is to keep calendar shifts in the history from distorting the tenure
+curve, and to anchor the hazard level to the most recent months. Extending
+the drift into the future was tested and rejected (§6).
+
+Expected survivors are propagated from each cell's *observed* December 2025
+survivors (`origin_retained`): S(m) = S(m−1)·(1 − h(age_m)).
 
 ### Cash per survivor: tier-aware composition
 
@@ -194,15 +204,16 @@ Full detail is in `validation/results/final_fit.json`.
 | Premium variable cost: Dec 2025 → Jan 2026 → Dec 2026 | $38.76 → $38.68 → $37.96 |
 | Add-on price per unit, Jan → Dec 2026 | $10.84 → $11.33 |
 | Refund share of gross | 1.11% |
-| sBG search/save-time, Jan 2024 cohort (trend member): α, β | 0.84, 2.19 |
-| Monthly churn at age 24 → 35, same cell (trend / no-cohort member) | 3.2% → 2.3% / 2.7% → 1.9% |
-| Monthly churn at age 24 → 35, partner/build-skill (trend / no-cohort member) | 2.0% → 1.5% / 1.8% → 1.3% |
+| Calendar drift γ per year (trend / no-cohort period members) | −0.07 / −0.33, both held at origin level |
+| Monthly churn at age 24 across members, Jan 2024 cohort: search/save-time | 2.3–3.2% |
+| Same, partner/build-skill | 1.6–2.0% |
+| Monthly churn at age 35, same cohort: search/save-time | 1.7–2.3% |
+| Same, partner/build-skill | 1.2–1.5% |
 
-**2026 totals.** We forecast **$1.045M contribution** on $2.115M net
-revenue and 27,937 member-months. The reference forecasts $1.008M on
-$2.147M and 28,806 member-months. Our forecast has slightly fewer members
-but more contribution per member, which matches the reference's backtest
-bias.
+**2026 totals.** The selected ensemble forecasts **$1.057M contribution** on
+$2.138M net revenue and 28,252 member-months. For comparison:
+- First pass: $1.045M on 27,937 member-months.
+- Reference: $1.008M on $2.147M net revenue and 28,806 member-months.
 
 ### Extrapolation beyond observed ages (24–35)
 
@@ -212,23 +223,25 @@ are for ages 24–35. The assumptions behind them:
 - **Retention.** sBG keeps the hazard falling as α/(α + β + t − 1). That
   decline comes only from heterogeneity sorting, so it slows smoothly and
   never turns negative or explodes. The observed hazards at ages 16–23
-  (1–4%) fit this shape, and the model implies 1.3–3.2% at ages 24–35. We
-  rejected the logit tenure curve partly because a log-age term with no
-  heterogeneity basis extrapolated worst in validation. Its error was
-  largest at the origin with the longest relative extrapolation: a
-  2024-07-01 cutoff, observed ages ≤ 5, forecasts to age 17.
+  (1–4%) fit this shape, and the members imply 1.2–3.2% per month at ages
+  24–35. Calendar drift is frozen, so no member extrapolates a calendar
+  trend into 2026. We rejected the logit tenure curve partly because a
+  log-age term with no heterogeneity basis extrapolated worst in validation.
+  Its error was largest at the origin with the longest relative
+  extrapolation: a 2024-07-01 cutoff, observed ages ≤ 5, forecasts to age 17.
 - **Cash.** Tier upgrades, prices and the refund share are nearly stationary
   in tenure, so they extrapolate safely. The two calendar trends (cost and
-  add-ons) are the riskiest assumption. The linear cost trend lowers
-  2026 cost below the last observed level by $0.07 (January) to $0.80
-  (December) per member-month, about 1% of contribution on average.
-  Validation favoured including it (ablation below).
+  add-ons) are the riskiest assumption. The linear cost trend lowers 2026
+  cost below the last observed level by $0.07 (January) to $0.80 (December)
+  per member-month, about 1% of contribution on average. Validation slightly
+  favoured including it (ablations below).
 
 ## 5. Chronological validation
 
-**Design.** We used six historical origins with exclusive cutoffs on
-2024-07-01, 2024-10-01, 2025-01-01, 2025-04-01, 2025-07-01 and 2025-10-01.
-At each origin:
+**Design.** This is rolling-origin evaluation in the sense of Tashman (2000):
+six origins, recalibrated at each, with multiple test periods. The exclusive
+cutoffs are 2024-07-01, 2024-10-01, 2025-01-01, 2025-04-01, 2025-07-01 and
+2025-10-01. At each origin:
 
 1. `panel.truncate_tables` recreates what a release at that cutoff would have
    contained: renewals due before the cutoff, and ledger rows, events,
@@ -267,31 +280,32 @@ comes from `validation/results/backtest_by_origin.csv`.
 
 | Model | 2024-07 | 2024-10 | 2025-01 | 2025-04 | 2025-07 | 2025-10 | Mean (selection) | Worst |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| **Selected: sBG ensemble + tier-aware cash** | **11.5%** | **5.9%** | **5.9%** | **4.1%** | **3.9%** | **3.8%** | **6.3%** | 11.5% |
-| sBG cohort trend + tier-aware cash | 12.2% | 5.2% | 8.2% | 4.0% | 3.5% | 3.1% | 6.6% | 12.2% |
-| sBG no cohort effect + tier-aware cash | 10.7% | 7.6% | 5.4% | 4.5% | 4.9% | 4.7% | 6.6% | 10.7% |
+| **Selected: 4-member sBG ensemble + tier-aware cash** | **8.2%** | **5.5%** | **6.6%** | **3.9%** | **3.7%** | **3.5%** | **5.6%** | **8.2%** |
+| Calendar-drift members only | 7.2% | 5.2% | 7.5% | 4.0% | 3.5% | 3.2% | 5.5% | 7.5% |
+| First pass: 2-member sBG ensemble + tier-aware cash | 11.5% | 5.9% | 5.9% | 4.1% | 3.9% | 3.8% | 6.3% | 11.5% |
+| sBG cohort trend + tier-aware cash | 12.2% | 5.2% | 8.2% | 4.0% | 3.4% | 3.1% | 6.6% | 12.2% |
+| sBG no cohort effect + tier-aware cash | 10.7% | 7.6% | 5.3% | 4.5% | 4.9% | 4.7% | 6.6% | 10.7% |
 | BdW cohort trend + tier-aware cash | 16.6% | 4.3% | 6.8% | 4.3% | 3.5% | 3.1% | 7.1% | 16.6% |
-| sBG random-walk cohort effects + tier-aware cash | 12.7% | 9.1% | 7.8% | 5.6% | 4.7% | 2.8% | 8.0% | 12.7% |
 | **Reference: hierarchical sBG + Gamma (released, refit)** | 16.5% | 8.8% | 6.3% | 7.3% | 7.1% | 6.6% | 9.2% | 16.5% |
 | Logit hazard + tier-aware cash | 22.8% | 7.4% | 7.7% | 5.3% | 4.4% | 3.1% | 9.5% | 22.8% |
 | Template constant-hazard example | 45.5% | 42.6% | 37.9% | 32.2% | 27.0% | 20.7% | 37.0% | 45.5% |
 
-Signed portfolio bias, selected vs reference:
+The selected model beats the reference at five of six origins. It loses at
+2025-01 (6.6% vs 6.3%).
 
-| Cutoff | Selected | Reference |
-|---|---:|---:|
-| 2024-07 | −9.8% | −16.4% |
-| 2024-10 | −0.3% | −8.3% |
-| 2025-01 | +4.4% | −1.9% |
-| 2025-04 | +0.2% | −5.8% |
-| 2025-07 | −2.1% | −6.5% |
-| 2025-10 | −3.3% | −6.5% |
+| Cutoff | Signed bias: selected | Signed bias: reference | Retention cell WAPE: selected | Retention cell WAPE: reference |
+|---|---:|---:|---:|---:|
+| 2024-07 | −5.8% | −16.4% | 12.4% | 12.1% |
+| 2024-10 | +0.8% | −8.3% | 8.1% | 8.4% |
+| 2025-01 | +5.4% | −1.9% | 10.1% | 10.5% |
+| 2025-04 | +0.8% | −5.8% | 7.4% | 7.5% |
+| 2025-07 | −1.6% | −6.5% | 6.2% | 5.8% |
+| 2025-10 | −2.9% | −6.5% | 4.5% | 4.4% |
 
-The selected model's mean absolute bias is 3.3%, versus 7.8% for the
-reference.
+Retention accuracy is now on par with the reference: mean 8.8% versus 8.9%.
 
-**Where the gain comes from.** Backtest totals for the sBG-trend member
-versus the reference:
+**Where the gain comes from.** Backtest totals for the first-pass sBG-trend
+member versus the reference:
 
 | Cutoff | Actual contribution per retained member | Ours | Reference |
 |---|---:|---:|---:|
@@ -301,37 +315,71 @@ versus the reference:
 | 2025-04 | $33.83 | $33.69 | $31.47 |
 | 2025-07 | $33.95 | $34.02 | $32.01 |
 
-The cash block is accurate to within about 1%. The remaining error is
-retention, where the two approaches are similar: mean cell retention WAPE
-is 9.3% for ours versus 8.9% for the reference. **The reference's Bayesian
-retention is slightly better.** At the 2025-01 origin, both over-forecast
-survival through 2025 for most 2024 cohorts, by roughly 2–9%.
+The cash block is accurate to within about 1%.
 
-**Ablations of the selected model** (mean selection WAPE):
+**Ablations of the selected model** (mean / worst selection WAPE):
 
-| Ablation | Mean WAPE |
-|---|---:|
-| Full model | 6.3% |
-| Flat (last-month) variable costs | 6.5% |
-| No add-on calendar or price trend | 6.5% |
-| No survivor tier mix (cell's historical renewal plan mix instead) | 14.2% |
+| Ablation | Mean | Worst |
+|---|---:|---:|
+| Full model | 5.6% | 8.2% |
+| Flat (last-month) variable costs | 5.6% | 9.0% |
+| No add-on calendar or price trend | 5.6% | 8.8% |
+| No survivor tier mix (cell's historical renewal plan mix instead) | 13.0% | 19.0% |
 
-**Caveats we want to be explicit about.**
+## 6. Second pass: research review and what we tested
 
-1. The ensemble was chosen after comparing about eight variants on the same
-   five origins, so its validation score is somewhat optimistic. The
-   ranking of the *cash block* versus the reference is robust: every sBG
+We reviewed contractual-retention research and open-source implementations,
+then turned each relevant practice into a backtest variant. Each variant was
+applied to the first-pass ensemble so the comparison is like-for-like.
+Results are mean / worst selection WAPE; the first pass scored 6.3% / 11.5%.
+
+| Practice (source) | Variant tested | Mean / worst | Decision |
+|---|---|---:|---|
+| Calendar/period effects in retention: Orduz's cohort-age × age × month models; changepoint models across cohorts (Gopalakrishnan, Wharton); age-period-cohort logic | Calendar drift fitted jointly, **frozen at origin** | 5.5% / 7.5% | **Adopted** as two of four members |
+| Same, but drift **extrapolated** into the forecast | Drift extended forward | 9.1% / 25.2% | Rejected: the drift is not identified and blows up |
+| Separate voluntary and involuntary churn (common in industry practice; different drivers and interventions) | Cancelled and failed-payment hazards as competing risks | 6.4% / 12.3% | Rejected: no gain. Failed payments here also fall with tenure |
+| Latent-class retention (`foretell` R package; finite mixtures) | Two-class geometric mixture | 8.3% / 17.6% | Rejected |
+| Hierarchical pooling of cohorts (Bayesian sBG practice; the released reference) | Ridge-pooled cohort intercepts around the trend | 7.6% / 12.3% | Rejected: young cohorts are over-shrunk |
+| Duration dependence (BdW, Fader et al. 2018) | BdW added as a third member | 6.4% / 12.8% | Rejected: unstable on short histories, as the authors anticipate |
+| Recency weighting / recalibration (rolling-origin practice, Tashman 2000) | Trials down-weighted with a 12-month half-life | 6.3% / 11.6% | Rejected: no gain |
+| Use the reference's Bayesian retention (model hybrid) | Reference retention × our cash | 6.5% / 10.6% | Rejected: no better than our retention, and it would add JAX/NumPyro |
+| Equal-weight combination ("forecast combination puzzle", Stock & Watson 2004; Timmermann 2006) | Equal weights for all ensembles | n/a | **Adopted**: no fitted weights |
+| Point forecast for an absolute-error score (Kolassa) | Expected values | n/a | Kept. The scored quantity is a cohort-month sum over many customers, so mean ≈ median |
+
+**Open-source implementations reviewed:**
+- PyMC-Marketing (`ShiftedBetaGeoModelIndividual`): Bayesian sBG for
+  individual contractual data.
+- `jdmaturen/shifted_beta_geometric_py`: numpy/scipy sBG with residual-
+  lifetime CLV.
+- `chrisclark/retentionizer`: per-cohort sBG fits and LTV.
+- `sriharitn/foretell` (R): sBG, BdW and latent-class Weibull.
+- Juan Orduz's cohort revenue-retention notebooks: BART and Flax/NumPyro.
+
+None of them models plan-tier migration in the margin, which was the largest
+error source here. Our sBG likelihood matches the grouped conditional-renewal
+form used by these packages and by the reference.
+
+## 7. Caveats
+
+1. About twenty variants were compared on the same five origins across the
+   two passes, so the selected model's validation score is optimistic.
+2. The ranking of the *cash block* versus the reference is robust. Every sBG
    or BdW variant with it beats the reference on average, and the effect is
-   a consistent 6–9% per-member margin error. Paired with a logit hazard
-   it does not (9.5%), so retention form still matters. The choice among sBG retention
-   variants is less certain.
-2. Origins overlap in calendar time, so they are not independent.
-3. Format validity and backtest accuracy are not private-holdout accuracy.
-4. We report expected values. Absolute-error scoring does not assess
+   a consistent 6–9% per-member margin error. Paired with a logit hazard it
+   does not (9.5%), so retention form still matters.
+3. The second-pass gain is concentrated at the earliest origin, the one
+   least like the final task. Excluding it, the first pass, the
+   calendar-drift members and the selected ensemble all score about 4.7%.
+   We chose the four-member average over the calendar-drift members alone
+   for that reason: it improves robustness without betting on an
+   unidentified effect.
+4. Origins overlap in calendar time, so they are not independent.
+5. Format validity and backtest accuracy are not private-holdout accuracy.
+6. We report expected values. Absolute-error scoring does not assess
    uncertainty calibration, and this deterministic model reports no
    intervals.
 
-## 6. Information boundary
+## 8. Information boundary
 
 `predict(tables, prediction_grid, *, seed)` receives only the eight observed
 tables and the public grid. It uses:
@@ -373,7 +421,7 @@ SHA-256, runtime and environment) is in
 **Re-running validation.**
 
 ```text
-uv run --frozen python validation/backtest.py --data-dir /path/to/released/data     # our models (~1 min)
+uv run --frozen python validation/backtest.py --data-dir /path/to/released/data     # all variants (~2 min)
 uv run --frozen python validation/fit_report.py --data-dir /path/to/released/data   # fitted settings
 # reference refits need the released lab environment:
 cd customer-economics-lab && uv run --frozen python ../<team-repo>/validation/reference_backtest.py --data-dir data --out ../<team-repo>/validation/results/reference
@@ -384,7 +432,7 @@ cd customer-economics-lab && uv run --frozen python ../<team-repo>/validation/re
 | File | Purpose |
 |---|---|
 | `main.py` | Standard entry point. Exposes `predict(...)`, loads inputs, validates, writes predictions + receipt |
-| `model.py` | Retention (sBG / BdW / logit) and tier-aware cash blocks; `SELECTED` ensemble |
+| `model.py` | Retention (sBG / BdW / logit / latent-class / competing-risk options) and tier-aware cash blocks; `SELECTED` ensemble |
 | `panel.py` | Canonical cohort definitions, historical truncation, grid construction |
 | `pyproject.toml`, `uv.lock` | Locked Python 3.12 environment (pandas, numpy, scipy) |
 | `submission-contract.json`, `prediction_grid.csv` | Unmodified challenge contract and public grid |
@@ -398,5 +446,11 @@ cd customer-economics-lab && uv run --frozen python ../<team-repo>/validation/re
 - Fader, P. S., & Hardie, B. G. S. (2010). Customer-base valuation in a contractual setting: The perils of ignoring heterogeneity. *Marketing Science*, 29(1), 85–93.
 - Gupta, S., Lehmann, D. R., & Stuart, J. A. (2004). Valuing customers. *Journal of Marketing Research*, 41(1), 7–18.
 - McCarthy, D. M., Fader, P. S., & Hardie, B. G. S. (2017). Valuing subscription-based businesses using publicly disclosed customer data. *Journal of Marketing*, 81(1), 17–35.
-- Orduz, J. C. (2024). Cohort revenue retention analysis with Flax and NumPyro (adapted by the released reference).
+- Pfeifer, P. E., & Carraway, R. L. (2000). Modeling customer relationships as Markov chains. *Journal of Interactive Marketing*, 14(2), 43–55.
+- Tashman, L. J. (2000). Out-of-sample tests of forecasting accuracy: An analysis and review. *International Journal of Forecasting*, 16(4), 437–450.
+- Stock, J. H., & Watson, M. W. (2004). Combination forecasts of output growth in a seven-country data set. *Journal of Forecasting*, 23(6), 405–430.
+- Timmermann, A. (2006). Forecast combinations. In *Handbook of Economic Forecasting*, Vol. 1, 135–196.
+- Kolassa, S. (2020). Why the "best" point forecast depends on the error or accuracy measure. *International Journal of Forecasting*, 36(1), 208–211.
+- Orduz, J. C. (2024–2025). Cohort revenue & retention analysis: a Bayesian approach (BART and Flax/NumPyro notebooks; arXiv 2504.16216).
+- Gopalakrishnan, A. Hierarchical Bayesian cross-cohort changepoint model (Wharton working paper).
 - Studio North customer-economics lab (released reference model, data and challenge contract).

@@ -30,6 +30,9 @@ cells = pd.DataFrame([(c, n) for c in ['search', 'partner'] for n in ['save_time
 for name, cfg in model.SELECTED.items():
     hz = model.MixtureHazard(cfg, origin).fit(sp)
     entry = {'converged': hz.converged, 'cells': []}
+    if cfg.period_effect:
+        entry['calendar_drift_per_year_log_multiplier'] = float(hz.params[-1])
+        entry['calendar_drift_note'] = 'estimated jointly; held at the December 2025 level in forecasts'
     for r in cells.itertuples(index=False):
         for cohort in ['2024-01-01', '2025-12-01']:
             ci = int(panel.month_index([cohort])[0])
@@ -43,7 +46,7 @@ for name, cfg in model.SELECTED.items():
                                    'alpha': mu * phi, 'beta': (1 - mu) * phi,
                                    'monthly_churn_at_age': dict(zip(map(str, f.age), map(float, hz.predict(f))))})
     report['members'][name] = entry
-cash = model.Cash(model.SELECTED['sbg_cohort_trend'], origin).fit(sp, tx)
+cash = model.Cash(next(iter(model.SELECTED.values())), origin).fit(sp, tx)
 months = np.arange(origin + 1, origin + 13)
 report['cash'] = {
     'tier_prices': {('premium' if k else 'standard'): v for k, v in cash.price.items()},
@@ -65,7 +68,8 @@ report['origin_premium_share'] = float(survivors.premium.mean())
 pred = model.forecast_ensemble(tables, grid)
 ref_path = HERE / 'results' / 'reference' / 'final_2026.csv'
 tot = lambda d: {k: float(d[k].sum()) for k in model.PREDICTIONS}
-report['forecast_2026_totals'] = {'selected': tot(pred)}
+report['forecast_2026_totals'] = {'selected': tot(pred),
+                                  'first_pass_ensemble': tot(model.forecast_ensemble(tables, grid, model.FIRST_PASS))}
 if ref_path.exists():
     report['forecast_2026_totals']['reference_sbg_gamma'] = tot(pd.read_csv(ref_path))
 dec25 = sp[(sp.month == origin) & sp.paid].shape[0]
