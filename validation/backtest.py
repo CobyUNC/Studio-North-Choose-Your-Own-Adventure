@@ -47,6 +47,8 @@ VARIANTS = {
     'r2_cohort_partial_pooling': mod(cohort_ridge=4.0),
     'r2_recency_weight_halflife12': mod(trial_halflife=12.0),
     'r2_plus_bdw_member': {**FIRST_PASS, 'bdw': Config(hazard_kind='bdw', cohort_trend=True)},
+    # Third pass: recent-level cash anchor (idea from a teammate's model), on the selected ensemble
+    'r3_cash_anchor_prior100': {k: Config(**{**v.__dict__, 'cash_anchor': 100.0}) for k, v in SELECTED.items()},
     # Ablations of the selected ensemble's cash block
     'ablation_no_tier_mix': {k: Config(**{**v.__dict__, 'tier_aware': False}) for k, v in SELECTED.items()},
     'ablation_flat_costs': {k: Config(**{**v.__dict__, 'cost_trend': 'flat'}) for k, v in SELECTED.items()},

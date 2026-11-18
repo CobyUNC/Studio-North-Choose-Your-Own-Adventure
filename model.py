@@ -58,6 +58,8 @@ class Config:
     cost_window: int = 6                    # months used for the cost trend
     damping: float = 0.9                    # monthly damping of cost trend if 'damped'
     cash_window: int = 12                   # months used for refund/add-on price ratios
+    cash_anchor: float = 0.0                # prior member-months for a recent-level cash anchor (0 = off)
+    anchor_months: int = 3
     extra: dict = field(default_factory=dict)
 
 
@@ -439,6 +441,42 @@ def forecast_ensemble(tables: dict[str, pd.DataFrame], grid: pd.DataFrame,
     return out
 
 
+def _member_cash(cash: 'Cash', frame: pd.DataFrame, tier: bool) -> tuple[np.ndarray, np.ndarray]:
+    """Expected net revenue and contribution per paid member of one tier."""
+    months = frame.month.to_numpy()
+    units = cash.addon_units(frame.assign(premium=float(tier)))
+    gross = cash.price[tier] + units * cash.addon_unit_price(months)
+    member_net = gross * (1 - cash.refund_share)
+    return member_net, member_net - cash.sub_cost(tier, months) - units * cash.addon_cost
+
+
+def _cash_anchor(cash, sp, tx, key, origin, config) -> tuple[float, float]:
+    """Shrunk ratio of a cell's actual to modelled cash over its last renewal months.
+
+    Expected cash uses the cell's *actual* paid members by tier in each month, so the
+    ratio isolates cell-specific add-on/refund behaviour. Acquisition months (age 0)
+    are excluded because they carry first-month discounts.
+    """
+    cell = sp[(sp.cohort_month == key[0]) & (sp.channel == key[1]) & (sp.primary_need == key[2]) & sp.paid
+              & (sp.month > origin - config.anchor_months) & (sp.age >= 1)]
+    if cell.empty:
+        return 1.0, 1.0
+    counts = cell.groupby(['month', 'age', 'premium']).size().reset_index(name='n')
+    exp_net = exp_con = 0.0
+    for r in counts.itertuples(index=False):
+        f = pd.DataFrame({'channel': [key[1]], 'primary_need': [key[2]], 'age': [r.age], 'month': [r.month]})
+        mn, mc = _member_cash(cash, f, bool(r.premium))
+        exp_net += r.n * float(mn[0]); exp_con += r.n * float(mc[0])
+    people = set(cell.person_id)
+    t = tx[tx.person_id.isin(people) & tx.month.isin(set(cell.month))]
+    t = t.merge(cell[['person_id', 'month']], on=['person_id', 'month'])
+    w = float(len(cell)); k = w / (w + config.cash_anchor)
+    act_net, act_con = float(t.net.sum()), float(t.contribution.sum())
+    f_net = 1 + k * (act_net / exp_net - 1) if exp_net > 0 else 1.0
+    f_con = 1 + k * (act_con / exp_con - 1) if exp_con > 0 else 1.0
+    return max(f_net, 0.0), max(f_con, 0.0)
+
+
 def forecast(tables: dict[str, pd.DataFrame], grid: pd.DataFrame, config: Config = Config()) -> pd.DataFrame:
     grid = grid.copy()
     first_future = int(panel.month_index(grid.calendar_month).min())
@@ -482,15 +520,13 @@ def forecast(tables: dict[str, pd.DataFrame], grid: pd.DataFrame, config: Config
             p = p + (1 - p) * up[j] - p * cash.downgrade_rate * config.tier_aware
             premium_share[j] = p
         net = np.zeros(len(frame)); contribution = np.zeros(len(frame))
-        unit_price = cash.addon_unit_price(months)
         for tier, share in ((True, premium_share), (False, 1 - premium_share)):
-            tf = frame.assign(premium=float(tier))
-            units = cash.addon_units(tf)
-            gross = cash.price[tier] + units * unit_price
-            member_net = gross * (1 - cash.refund_share)
-            member_contribution = member_net - cash.sub_cost(tier, months) - units * cash.addon_cost
+            member_net, member_contribution = _member_cash(cash, frame, tier)
             net += share * member_net
             contribution += share * member_contribution
+        if config.cash_anchor > 0:
+            f_net, f_con = _cash_anchor(cash, sp, tx, key, origin, config)
+            net, contribution = net * f_net, contribution * f_con
         g['predicted_retained'] = retained
         g['predicted_net_revenue'] = retained * net
         g['predicted_contribution'] = retained * contribution

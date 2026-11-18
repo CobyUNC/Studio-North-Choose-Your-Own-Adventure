@@ -359,9 +359,37 @@ None of them models plan-tier migration in the margin, which was the largest
 error source here. Our sBG likelihood matches the grouped conditional-renewal
 form used by these packages and by the reference.
 
+### Third pass: comparison with a teammate's BdW model
+
+A teammate's separate submission was run, unchanged, through this repository's
+six-origin harness. Its own validation reported 6.77% WAPE at the 2024-12
+origin, and the harness reproduced that number. That model combines
+Beta-discrete-Weibull retention fitted on individual churn ages with a
+log-linear cash-per-member curve and a shrunk recent-level cash anchor.
+
+| Model | Mean (selection) | Worst | Mean abs. bias |
+|---|---:|---:|---:|
+| Selected ensemble (this repo) | 5.6% | 8.2% | 2.9% |
+| Teammate model, sBG variant | 6.6% | 12.6% | 3.9% |
+| Teammate model as submitted (BdW + anchor) | 8.6% | 20.3% | 6.2% |
+| Equal-weight average of the two submissions | 6.4% | 13.4% | 4.2% |
+
+- **The teammate's cash curve runs low.** It under-forecast contribution per
+  retained member by 1–3% at every origin; the tier-aware block was within
+  0.5%.
+- **BdW was unstable on short histories again.** The worst error came at the
+  2024-07 origin.
+- **The recent-level cash anchor was tested and not adopted.** We added it to
+  this model as `cash_anchor` (variant `r3_cash_anchor_prior100`). It changed
+  mean WAPE from 5.59% to 5.52%, better at four origins and worse at two.
+  That gain is within noise given the number of variants already compared,
+  so the option stays off and the submitted predictions are unchanged.
+- **Both models land close on 2026 contribution.** The teammate's model
+  forecasts $1.064M and this one $1.057M, against the reference's $1.008M.
+
 ## 7. Caveats
 
-1. About twenty variants were compared on the same five origins across the
+1. About twenty-five variants were compared on the same five origins across the
    two passes, so the selected model's validation score is optimistic.
 2. The ranking of the *cash block* versus the reference is robust. Every sBG
    or BdW variant with it beats the reference on average, and the effect is

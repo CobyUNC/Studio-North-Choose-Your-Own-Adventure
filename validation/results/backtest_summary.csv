@@ -1,5 +1,6 @@
 model,mean_wape,worst_wape,mean_abs_bias,mean_retention_wape,origins
 r2_period_frozen,0.054740,0.074842,0.025453,0.086482,5
+r3_cash_anchor_prior100,0.055190,0.080178,0.029210,0.088327,5
 selected_ensemble,0.055918,0.081827,0.028872,0.088327,5
 ablation_no_addon_trends,0.056200,0.087579,0.031577,0.088327,5
 ablation_flat_costs,0.056310,0.089615,0.029984,0.088327,5
