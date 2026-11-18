@@ -1,5 +1,5 @@
 {
-  "tested_commit": "0fc9cd620995f87e6a8fd4312c195d29ad53efb2",
+  "tested_commit": "2ca83b9f5e2132a8d5fe11a84f86e1ea1135dd1a",
   "note": "Model code (main.py, model.py, panel.py), uv.lock, contract and grid are unchanged between the tested commit and any later commit that only adds this evidence; the hashes below identify them.",
   "procedure": [
     "git clone into two separate empty folders; git checkout tested_commit",
@@ -11,7 +11,7 @@
     {
       "seed": 20261116,
       "rows": 1152,
-      "elapsed_seconds": 4.028902991999985,
+      "elapsed_seconds": 3.997577509999701,
       "prediction_sha256": "92e594112696425836e14a51eee4268bb56bbddf7ecbf93a628346ce4e506074",
       "source_sha256": "9aec7d8d26e54c44f44753eb5032be9ab61730b15b720153e350f3821ab88f6e",
       "uv_lock_sha256": "b3466891cb0ca8f0983008d2e3f5a8396e04232dc3d64797d00cb85f6a4fb0a0",
@@ -32,7 +32,7 @@
     {
       "seed": 20261116,
       "rows": 1152,
-      "elapsed_seconds": 3.9860148600000684,
+      "elapsed_seconds": 4.348674899000343,
       "prediction_sha256": "92e594112696425836e14a51eee4268bb56bbddf7ecbf93a628346ce4e506074",
       "source_sha256": "9aec7d8d26e54c44f44753eb5032be9ab61730b15b720153e350f3821ab88f6e",
       "uv_lock_sha256": "b3466891cb0ca8f0983008d2e3f5a8396e04232dc3d64797d00cb85f6a4fb0a0",
@@ -67,7 +67,7 @@
   },
   "model_sha256": {
     "main.py": "9aec7d8d26e54c44f44753eb5032be9ab61730b15b720153e350f3821ab88f6e",
-    "model.py": "bb97d13547afc9a3a4e2b9245aad701efb0e2eab1ecd215698b061fedce9c941",
+    "model.py": "772942a2084ed801a168352dc9732ab718d813ca555fbc0e85ba13620de61627",
     "panel.py": "f40940114dfe0c7574ba3f05bafe8cc7b4ef831c9f436c24a93ab27a95b27399",
     "uv.lock": "b3466891cb0ca8f0983008d2e3f5a8396e04232dc3d64797d00cb85f6a4fb0a0",
     "pyproject.toml": "5f44800ac3974115de13be10650295ffe24a17e1b63f517378158f5ad7d0403c",
